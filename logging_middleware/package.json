@@ -1,0 +1,9 @@
+{
+  "name": "logging_middleware",
+  "version": "1.0.0",
+  "description": "Reusable logging middleware that sends structured logs to the evaluation server",
+  "main": "index.js",
+  "keywords": [],
+  "author": "Anindya",
+  "license": "ISC"
+}
