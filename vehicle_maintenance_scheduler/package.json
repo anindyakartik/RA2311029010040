@@ -1,0 +1,15 @@
+{
+  "name": "vehicle_maintenance_scheduler",
+  "version": "1.0.0",
+  "description": "Microservice that selects the optimal set of vehicles for daily maintenance using a knapsack algorithm",
+  "main": "src/server.js",
+  "scripts": {
+    "start": "node src/server.js"
+  },
+  "dependencies": {
+    "logging_middleware": "file:../logging_middleware"
+  },
+  "keywords": [],
+  "author": "Anindya",
+  "license": "ISC"
+}
