@@ -1,0 +1,16 @@
+{
+  "name": "notification_app_be",
+  "version": "1.0.0",
+  "description": "Campus notification microservice with priority inbox feature",
+  "main": "src/server.js",
+  "scripts": {
+    "start": "node src/server.js",
+    "priority": "node src/priorityInbox.js"
+  },
+  "dependencies": {
+    "logging_middleware": "file:../logging_middleware"
+  },
+  "keywords": [],
+  "author": "Anindya",
+  "license": "ISC"
+}
