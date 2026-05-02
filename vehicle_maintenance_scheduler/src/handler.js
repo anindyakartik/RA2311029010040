@@ -28,13 +28,13 @@ async function handleSchedule(req, res) {
     let depotID = null;
 
     const url = new URL(req.url, `http://${req.headers.host}`);
-    depotID = url.searchParams.get("depotID");
+    depotID = (url.searchParams.get("depotID") || "").trim();
 
     if (!depotID && req.method === "POST") {
       const bodyStr = await _readBody(req);
       try {
         const bodyJson = JSON.parse(bodyStr);
-        depotID = bodyJson.depotID || bodyJson.depotId || bodyJson.depot_id;
+        depotID = String(bodyJson.depotID || bodyJson.depotId || bodyJson.depot_id || "").trim();
       } catch (_) {
         // body wasn't JSON – that's fine, depotID stays null
       }
@@ -67,10 +67,11 @@ async function handleSchedule(req, res) {
     ]);
 
     // ── locate the depot ─────────────────────────────────────
-    const depot = depots.find(
-      (d) =>
-        (d.ID || d.id || d.depotID || d.depotId) === depotID
-    );
+    const numericID = Number(depotID);
+    const depot = depots.find((d) => {
+      const did = d.ID || d.id || d.depotID || d.depotId;
+      return did === numericID || did === depotID || String(did) === depotID;
+    });
 
     if (!depot) {
       Log(
@@ -99,21 +100,8 @@ async function handleSchedule(req, res) {
       `handleSchedule – depot ${depotID} has ${capacity} mechanic-hours budget`
     ).catch(() => {});
 
-    // ── filter vehicles that belong to this depot ────────────
-    const depotVehicles = vehicles.filter(
-      (v) =>
-        (v.DepotID || v.depotID || v.depotId || v.depot_id) === depotID
-    );
-
-    Log(
-      "backend",
-      "info",
-      "handler",
-      `handleSchedule – ${depotVehicles.length} vehicles belong to depot ${depotID}`
-    ).catch(() => {});
-
-    // ── run optimisation ─────────────────────────────────────
-    const result = scheduler.selectVehicles(depotVehicles, capacity);
+    // ── run optimisation on all vehicles using depot capacity ────────
+    const result = scheduler.selectVehicles(vehicles, capacity);
 
     const elapsedMs = Date.now() - startTime;
 
@@ -132,7 +120,7 @@ async function handleSchedule(req, res) {
       selected: result.selectedVehicles,
       totalImpact: result.totalImpact,
       totalDuration: result.totalDuration,
-      vehiclesConsidered: depotVehicles.length,
+      vehiclesConsidered: vehicles.length,
       vehiclesSelected: result.selectedVehicles.length,
       computationTimeMs: elapsedMs,
     });
