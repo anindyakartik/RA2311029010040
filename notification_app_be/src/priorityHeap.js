@@ -16,9 +16,11 @@ class MinHeap {
 
   offer(item) {
     if (this._data.length < this._cap) {
+      // heap not full yet, just push and fix up
       this._data.push(item);
       this._bubbleUp(this._data.length - 1);
     } else if (item.score > this._data[0].score) {
+      // new item beats the weakest item currently in the top-N, swap it in
       this._data[0] = item;
       this._sinkDown(0);
     }
@@ -27,6 +29,7 @@ class MinHeap {
   drainSorted() {
     const sorted = [];
     while (this._data.length > 0) sorted.push(this._extractMin());
+    // extractMin gives us ascending order, we want highest priority first
     sorted.reverse();
     return sorted;
   }
@@ -76,6 +79,9 @@ function topNPriority(notifications, n, typeWeights) {
     const notif = notifications[i];
     const weight = typeWeights[notif.Type || notif.type] || 1;
     const ts = new Date(notif.Timestamp || notif.timestamp || 0).getTime();
+
+    // multiply weight by 1e15 so it always dominates over the timestamp part
+    // within the same type, more recent timestamp = higher score
     const score = weight * 1e15 + ts;
     heap.offer({ score, notification: notif });
   }

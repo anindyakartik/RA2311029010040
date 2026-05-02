@@ -9,6 +9,7 @@ async function handleSchedule(req, res) {
     const url = new URL(req.url, `http://${req.headers.host}`);
     let depotID = (url.searchParams.get("depotID") || "").trim();
 
+    // also accept POST with a JSON body if someone prefers that
     if (!depotID && req.method === "POST") {
       const bodyStr = await readBody(req);
       try {
@@ -30,6 +31,7 @@ async function handleSchedule(req, res) {
       dataService.fetchVehicles(),
     ]);
 
+    // the API sends IDs as integers but query params come in as strings
     const numericID = Number(depotID);
     const depot = depots.find((d) => {
       const id = d.ID || d.id || d.depotID || d.depotId;

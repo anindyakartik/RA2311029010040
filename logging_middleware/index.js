@@ -3,6 +3,7 @@ const http = require("http");
 const VALID_STACKS = new Set(["backend", "frontend"]);
 const VALID_LEVELS = new Set(["debug", "info", "warn", "error", "fatal"]);
 
+// backend gets the full list, frontend is limited to shared packages only
 const BACKEND_PACKAGES = new Set([
   "cache", "controller", "cron_job", "db", "domain",
   "handler", "repository", "route", "service",

@@ -14,6 +14,7 @@ async function fetchDepots() {
   }
 
   const parsed = JSON.parse(res.body);
+  // API has returned different shapes in different environments, handle both
   const depots = parsed.depots || parsed.data || parsed;
 
   Log("backend", "info", "service", `fetched ${depots.length} depots`).catch(() => {});
