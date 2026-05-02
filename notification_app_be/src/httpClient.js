@@ -1,11 +1,3 @@
-/**
- * httpClient.js
- *
- * Light HTTP helper used by the notification app.
- * Same approach as the vehicle scheduler – wraps Node's http
- * module so the rest of the code stays clean.
- */
-
 const http = require("http");
 const { Log } = require("logging_middleware");
 
@@ -17,33 +9,19 @@ function get(url, headers = {}) {
       port: parsed.port || 80,
       path: parsed.pathname + parsed.search,
       method: "GET",
-      headers: headers,
+      headers,
     };
 
-    Log(
-      "backend",
-      "debug",
-      "utils",
-      `httpClient – GET ${parsed.pathname}`
-    ).catch(() => {});
+    Log("backend", "debug", "utils", `GET ${parsed.pathname}`).catch(() => {});
 
     const req = http.request(opts, (res) => {
       let data = "";
-      res.on("data", (chunk) => {
-        data += chunk;
-      });
-      res.on("end", () => {
-        resolve({ statusCode: res.statusCode, body: data });
-      });
+      res.on("data", (chunk) => { data += chunk; });
+      res.on("end", () => resolve({ statusCode: res.statusCode, body: data }));
     });
 
     req.on("error", (err) => {
-      Log(
-        "backend",
-        "error",
-        "utils",
-        `httpClient – GET ${parsed.pathname} failed: ${err.message}`
-      ).catch(() => {});
+      Log("backend", "error", "utils", `GET ${parsed.pathname} failed: ${err.message}`).catch(() => {});
       reject(err);
     });
 

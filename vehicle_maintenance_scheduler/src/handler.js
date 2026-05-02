@@ -1,156 +1,83 @@
-/**
- * handler.js
- *
- * HTTP request handler for the vehicle maintenance scheduler.
- * Sits between the raw HTTP layer and the business logic.
- */
-
 const dataService = require("./dataService");
 const scheduler = require("./scheduler");
 const { Log } = require("logging_middleware");
 
-/**
- * Handle a schedule request.
- *
- * Expected query parameter: depotID
- * Example: GET /schedule?depotID=abc-123
- *
- * Alternatively accepts POST with JSON body { "depotID": "..." }
- *
- * @param {http.IncomingMessage} req
- * @param {http.ServerResponse} res
- */
 async function handleSchedule(req, res) {
   const startTime = Date.now();
 
   try {
-    // ── extract depotID ──────────────────────────────────────
-    let depotID = null;
-
     const url = new URL(req.url, `http://${req.headers.host}`);
-    depotID = (url.searchParams.get("depotID") || "").trim();
+    let depotID = (url.searchParams.get("depotID") || "").trim();
 
     if (!depotID && req.method === "POST") {
-      const bodyStr = await _readBody(req);
+      const bodyStr = await readBody(req);
       try {
-        const bodyJson = JSON.parse(bodyStr);
-        depotID = String(bodyJson.depotID || bodyJson.depotId || bodyJson.depot_id || "").trim();
-      } catch (_) {
-        // body wasn't JSON – that's fine, depotID stays null
-      }
+        const parsed = JSON.parse(bodyStr);
+        depotID = String(parsed.depotID || parsed.depotId || parsed.depot_id || "").trim();
+      } catch (_) {}
     }
 
     if (!depotID) {
-      Log(
-        "backend",
-        "warn",
-        "handler",
-        "handleSchedule – request missing depotID parameter"
-      ).catch(() => {});
-      _respond(res, 400, {
-        error: "depotID is required (pass as query param or JSON body)",
-      });
+      Log("backend", "warn", "handler", "missing depotID in request").catch(() => {});
+      respond(res, 400, { error: "depotID is required" });
       return;
     }
 
-    Log(
-      "backend",
-      "info",
-      "handler",
-      `handleSchedule – processing request for depot ${depotID}`
-    ).catch(() => {});
+    Log("backend", "info", "handler", `schedule request for depot ${depotID}`).catch(() => {});
 
-    // ── fetch live data ──────────────────────────────────────
     const [depots, vehicles] = await Promise.all([
       dataService.fetchDepots(),
       dataService.fetchVehicles(),
     ]);
 
-    // ── locate the depot ─────────────────────────────────────
     const numericID = Number(depotID);
     const depot = depots.find((d) => {
-      const did = d.ID || d.id || d.depotID || d.depotId;
-      return did === numericID || did === depotID || String(did) === depotID;
+      const id = d.ID || d.id || d.depotID || d.depotId;
+      return id === numericID || id === depotID || String(id) === depotID;
     });
 
     if (!depot) {
-      Log(
-        "backend",
-        "warn",
-        "handler",
-        `handleSchedule – depot ${depotID} not found in ${depots.length} depots`
-      ).catch(() => {});
-      _respond(res, 404, { error: `depot ${depotID} not found` });
+      Log("backend", "warn", "handler", `depot ${depotID} not found`).catch(() => {});
+      respond(res, 404, { error: `depot ${depotID} not found` });
       return;
     }
 
     const capacity =
-      parseFloat(depot.Capacity) ||
-      parseFloat(depot.capacity) ||
-      parseFloat(depot.MechanicHours) ||
-      parseFloat(depot.mechanicHours) ||
-      parseFloat(depot.Budget) ||
-      parseFloat(depot.budget) ||
-      0;
+      parseFloat(depot.MechanicHours) || parseFloat(depot.Capacity) ||
+      parseFloat(depot.Budget) || 0;
 
-    Log(
-      "backend",
-      "info",
-      "handler",
-      `handleSchedule – depot ${depotID} has ${capacity} mechanic-hours budget`
-    ).catch(() => {});
+    Log("backend", "info", "handler", `depot ${depotID} budget: ${capacity}h`).catch(() => {});
 
-    // ── run optimisation on all vehicles using depot capacity ────────
     const result = scheduler.selectVehicles(vehicles, capacity);
+    const elapsed = Date.now() - startTime;
 
-    const elapsedMs = Date.now() - startTime;
+    Log("backend", "info", "handler", `returning ${result.selectedVehicles.length} vehicles in ${elapsed}ms`).catch(() => {});
 
-    Log(
-      "backend",
-      "info",
-      "handler",
-      `handleSchedule – returning ${result.selectedVehicles.length} vehicles ` +
-        `(impact ${result.totalImpact}, duration ${result.totalDuration}h) ` +
-        `in ${elapsedMs}ms`
-    ).catch(() => {});
-
-    _respond(res, 200, {
-      depotID: depotID,
-      capacity: capacity,
+    respond(res, 200, {
+      depotID,
+      capacity,
       selected: result.selectedVehicles,
       totalImpact: result.totalImpact,
       totalDuration: result.totalDuration,
       vehiclesConsidered: vehicles.length,
       vehiclesSelected: result.selectedVehicles.length,
-      computationTimeMs: elapsedMs,
+      computationTimeMs: elapsed,
     });
   } catch (err) {
-    Log(
-      "backend",
-      "error",
-      "handler",
-      `handleSchedule – unhandled error: ${err.message}`
-    ).catch(() => {});
-
-    _respond(res, 500, { error: "internal server error", detail: err.message });
+    Log("backend", "error", "handler", `unhandled error: ${err.message}`).catch(() => {});
+    respond(res, 500, { error: "internal server error", detail: err.message });
   }
 }
 
-// ── helper: read full request body ─────────────────────────────
-
-function _readBody(req) {
+function readBody(req) {
   return new Promise((resolve) => {
     let data = "";
-    req.on("data", (chunk) => {
-      data += chunk;
-    });
+    req.on("data", (chunk) => { data += chunk; });
     req.on("end", () => resolve(data));
   });
 }
 
-// ── helper: send JSON response ─────────────────────────────────
-
-function _respond(res, statusCode, payload) {
+function respond(res, statusCode, payload) {
   const body = JSON.stringify(payload, null, 2);
   res.writeHead(statusCode, {
     "Content-Type": "application/json",
